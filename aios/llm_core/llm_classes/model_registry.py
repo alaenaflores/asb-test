@@ -22,5 +22,9 @@ MODEL_REGISTRY = {
 
     # claude
     'claude-3-5-sonnet-20240620': ClaudeLLM,
-    'bedrock/anthropic.claude-3-haiku-20240307-v1:0': BedrockLLM
+    'bedrock/anthropic.claude-3-haiku-20240307-v1:0': BedrockLLM,
+
+    # OpenAI-compatible hosted models
+    'gpt-oss-120b': GPTLLM,
+    'nemotron-3-super-120b-a12b': GPTLLM,
 }

@@ -39,7 +39,7 @@ class BaseLogger:
         click.secho(f"[{self.logger_name}] " + content, fg=self.level_color[level])
 
     def log_to_file(self, content, log_file):
-        with open(log_file, "a") as w:
+        with open(log_file, "a", encoding="utf-8") as w:
             w.writelines(content)
 
 class SchedulerLogger(BaseLogger):
@@ -92,7 +92,7 @@ class LLMKernelLogger(BaseLogger):
 
     def log_to_console(self, content, level):
         # print(content)
-        click.secho(f"[\U0001F916{self.logger_name}] " + content, fg=self.level_color[level], bold=True)
+        click.secho(f"[LLM:{self.logger_name}] " + content, fg=self.level_color[level], bold=True)
 
     def load_log_file(self):
         date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

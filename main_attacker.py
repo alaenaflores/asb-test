@@ -1,5 +1,6 @@
 # This is a main script that tests the functionality of specific agents.
 # It requires no user input.
+import sys
 from aios.scheduler.fifo_scheduler import FIFOScheduler
 from aios.utils.utils import (
     parse_global_args,
@@ -18,6 +19,11 @@ import torch, csv
 import numpy as np
 import random,json,os
 from openai import OpenAI
+import traceback
+
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(encoding="utf-8", errors="replace")
 
 # from pyopenagi.api_key import OPENAI_API_KEY
 from dotenv import load_dotenv
@@ -84,7 +90,7 @@ def judge_response(model_response):
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-oss-120b",
             messages=[
                 {"role": "system", "content": f"{sys}"},
                 {"role": "user", "content": f"{user}"}
@@ -137,11 +143,12 @@ def main():
         agent_log_mode=agent_log_mode,
     )
 
-    agent_thread_pool = ThreadPoolExecutor(max_workers=5000)
+    agent_thread_pool = ThreadPoolExecutor(max_workers=32)
 
     scheduler.start()
 
     agent_tasks = list()
+    agent_task_metadata = dict()
 
     attacker_tools_all = pd.read_json(args.attacker_tools_path, lines=True)
     tasks_path = pd.read_json(args.tasks_path, lines=True)
@@ -185,6 +192,11 @@ def main():
                 )
 
                 agent_tasks.append(agent_attack)
+                agent_task_metadata[agent_attack] = {
+                    "agent_name": agent_name,
+                    "attack_tool": tool["Attacker Tool"],
+                    "agg": tool["Aggressive"],
+                }
 
     attack_succ = 0
     workflow_failure = 0
@@ -193,14 +205,14 @@ def main():
     orgin_succ = 0
 
 
-    with open(args.res_file, mode='w', newline='') as file:
+    with open(args.res_file, mode='w', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
         writer.writerow([
             "Agent Name",
             "Attack Tool",
             "Attack Successful",
             "Original Task Successful",
-            # "Workflow Failure",
+            "Workflow Failure",
             "Refuse Result",
             # "Task",
             "Memory Found",
@@ -210,7 +222,30 @@ def main():
 
 
     for r in as_completed(agent_tasks):
-        res = r.result()
+        try:
+            res = r.result()
+        except Exception as e:
+            workflow_failure += 1
+            print("**********************************")
+            print(f"Worker failed before returning a result: {e}")
+            print(traceback.format_exc())
+            print("**********************************")
+            task_info = agent_task_metadata.get(r, {})
+            with open(args.res_file, mode='a', newline='', encoding='utf-8') as file:
+                writer = csv.writer(file)
+                writer.writerow([
+                    task_info.get("agent_name", "UNKNOWN"),
+                    task_info.get("attack_tool", "UNKNOWN"),
+                    0,
+                    0,
+                    1,
+                    "N/A",
+                    "N/A",
+                    1 if task_info.get("agg") == 'True' else 0,
+                    f"Worker failed before returning a result: {e}"
+                ])
+            continue
+
         print("**********************************")
         print(args)
 
@@ -230,10 +265,10 @@ def main():
         else:
             print("Original task failed.")
 
-        # workflow_failure_flag = res['workflow_failure']
-        # if workflow_failure_flag:
-        #     workflow_failure += 1
-        #     print("Workflow generation failed.")
+        workflow_failure_flag = res.get('workflow_failure', False)
+        if workflow_failure_flag:
+            workflow_failure += 1
+            print("Workflow generation failed.")
 
         for message in res["messages"]:
             print(message)
@@ -276,14 +311,14 @@ def main():
 
 
         # 保存结果到 CSV
-        with open(args.res_file, mode='a', newline='') as file:
+        with open(args.res_file, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerow([
                 res['agent_name'],
                 attack_tool,
                 1 if attack_successful else 0,
                 1 if original_successful else 0,
-                # 1 if workflow_failure_flag else 0,
+                1 if workflow_failure_flag else 0,
                 1 if refuse_res=='0' else 0,
                 # refuse_res,
                 # task.split(';')[0],
@@ -298,7 +333,11 @@ def main():
     print(f'Number of workflow generation failures: {workflow_failure}')
     # print(f'Number of tool calling success: {tool_call_success}')
     print(f"Attack success rate: {attack_succ/len(agent_tasks)}")
-    print(f"Attack success rate excluding workflow failure cases: {attack_succ/(len(agent_tasks)-workflow_failure)}")
+    completed_attacks = len(agent_tasks) - workflow_failure
+    if completed_attacks:
+        print(f"Attack success rate excluding workflow failure cases: {attack_succ/completed_attacks}")
+    else:
+        print("Attack success rate excluding workflow failure cases: N/A")
     print(f'Number of original task success: {orgin_succ}')
     print(f'Original task success rate: {orgin_succ/len(agent_tasks)}')
 

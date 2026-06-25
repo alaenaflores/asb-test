@@ -1,4 +1,3 @@
-import re
 from .base_llm import BaseLLM
 import time
 
@@ -46,9 +45,6 @@ class GPTLLM(BaseLLM):
             agent_process,
             temperature=0.0
         ):
-        # ensures the model is the current one
-        assert re.search(r'gpt', self.model_name, re.IGNORECASE)
-
         """ wrapper around openai api """
         agent_process.set_status("executing")
         agent_process.set_start_time(time.time())

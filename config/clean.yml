@@ -18,8 +18,11 @@ llms:
   # - ollama/llama3:70b
   # - ollama/llama3.1:70b
   # - ollama/mixtral:8x7b
-  - ollama/llama3:8b
+  # - ollama/llama3:8b
   # - ollama/llama3.1:8b
+
+  #AF: Added
+  - gpt-oss-120b
 
 attack_types:
   - combined_attack

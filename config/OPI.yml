@@ -9,7 +9,10 @@ llms:
   # - gpt-3.5-turbo
   # - gpt-4o-2024-08-06
   # - claude-3-5-sonnet-20240620
-  - ollama/qwen2:72b
+  # - ollama/qwen2:72b
+  #AF: Added
+  # - gpt-oss-120b
+  - nemotron-3-super-120b-a12b
   # - ollama/qwen2:7b
   # - ollama/gemma2:9b
   # - ollama/gemma2:27b
@@ -20,8 +23,8 @@ llms:
   # - ollama/llama3.1:8b
 
 attack_types:
-  # - combined_attack
-  - context_ignoring
+   - combined_attack
+  # - context_ignoring
   # - fake_completion
   # - escape_characters
   # - naive

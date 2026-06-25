@@ -12,7 +12,7 @@ from threading import Thread
 
 from ..utils.logger import AgentLogger
 
-from ..utils.chat_template import Query
+from ..utils.chat_template import Query, Response
 
 import importlib
 
@@ -77,6 +77,9 @@ class BaseAgent:
         pass
 
     def check_workflow(self, message):
+        if not isinstance(message, str) or not message.strip():
+            return None
+
         try:
             # print(f"Workflow message: {message}")
             workflow = json.loads(message)
@@ -90,7 +93,7 @@ class BaseAgent:
 
             return workflow
 
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, TypeError):
             return None
 
     def automatic_workflow(self):
@@ -217,27 +220,41 @@ class BaseAgent:
     def query_loop(self, query):
         agent_process = self.create_agent_request(query)
 
-        completed_response, start_times, end_times, waiting_times, turnaround_times = "", [], [], [], []
+        completed_response, start_times, end_times, waiting_times, turnaround_times = None, [], [], [], []
 
         while agent_process.get_status() != "done":
-            thread = Thread(target=self.listen, args=(agent_process, ))
             current_time = time.time()
             # reinitialize agent status
             agent_process.set_created_time(current_time)
             agent_process.set_response(None)
             LLMRequestQueue.add_message(agent_process)
 
-            thread.start()
-            thread.join()
+            completed_response = self.listen(agent_process)
 
-            completed_response = agent_process.get_response()
+            if completed_response is None:
+                completed_response = Response(
+                    response_message="Workflow failed: no response was returned by the LLM scheduler."
+                )
+                agent_process.set_response(completed_response)
+                agent_process.set_status("done")
+                agent_process.set_end_time(time.time())
+
             if agent_process.get_status() != "done":
+                response_message = getattr(
+                    completed_response,
+                    "response_message",
+                    "No response returned yet."
+                )
                 self.logger.log(
-                    f"Suspended due to the reach of time limit ({agent_process.get_time_limit()}s). Current result is: {completed_response.response_message}\n",
+                    f"Suspended due to the reach of time limit ({agent_process.get_time_limit()}s). Current result is: {response_message}\n",
                     level="suspending"
                 )
             start_time = agent_process.get_start_time()
             end_time = agent_process.get_end_time()
+            if start_time is None:
+                start_time = current_time
+            if end_time is None:
+                end_time = time.time()
             waiting_time = start_time - agent_process.get_created_time()
             turnaround_time = end_time - agent_process.get_created_time()
 
@@ -270,7 +287,10 @@ class BaseAgent:
             str: LLM response of Agent Process
         """
         while agent_process.get_response() is None:
-            time.sleep(0.2)
+            try:
+                time.sleep(0.2)
+            except OSError:
+                return None
 
         return agent_process.get_response()
 

@@ -48,7 +48,7 @@ if __name__ == '__main__':
                 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
 
-                base_cmd = f'''nohup python main_attacker.py --llm_name {llm} --attack_type {attack_type} --use_backend {backend} --attacker_tools_path {attacker_tools_path} --res_file {log_file}_{suffix}.csv'''
+                base_cmd = f'''python main_attacker.py --llm_name {llm} --attack_type {attack_type} --use_backend {backend} --attacker_tools_path {attacker_tools_path} --res_file {log_file}_{suffix}.csv'''
 
                 if database:
                     base_cmd += f' --database {database}'
@@ -72,7 +72,7 @@ if __name__ == '__main__':
                 else:
                     specific_cmd = ''
 
-                cmd = f"{base_cmd}{specific_cmd} > {log_file}_{suffix}.log 2>&1 &"
+                cmd = f"{base_cmd}{specific_cmd} > {log_file}_{suffix}.log 2>&1"
                 
                 print(f'{log_file}_{suffix}.log')
                 os.system(cmd)
